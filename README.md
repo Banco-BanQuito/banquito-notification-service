@@ -18,7 +18,7 @@ Este servicio pertenece a Anthony y forma parte del sistema Switch de Pagos Masi
 | Uso | Puerto | Descripcion |
 | --- | --- | --- |
 | REST interno | `8089` | Pruebas locales y compatibilidad |
-| gRPC interno | `9099` | Comunicacion recomendada entre microservicios |
+| gRPC interno | `9092` | Comunicacion recomendada entre microservicios |
 
 Importante: este servicio no debe exponerse en Kong. Solo lo consumen microservicios internos como `routing-service` o `report-service`.
 
@@ -33,14 +33,14 @@ src/main/proto/notification.proto
 Servicio:
 
 ```text
-banquito.notification.v2.NotificationService/SendNotification
+com.banquito.switch.notification.NotificationService/SendNotification
 ```
 
 Request:
 
 ```json
 {
-  "paymentDetailId": "detalle-uuid-o-id",
+  "paymentDetailId": 123,
   "emailTo": "beneficiario@correo.com",
   "subject": "Pago recibido - BanQuito",
   "bodyTemplate": "BENEFICIARY_PAYMENT",
@@ -59,8 +59,7 @@ Response:
 {
   "notificationId": "uuid",
   "status": "ENVIADO",
-  "sentAt": "2026-05-30T14:04:00Z",
-  "errorMessage": ""
+  "status": "ENVIADO"
 }
 ```
 
@@ -142,7 +141,7 @@ Si MongoDB no esta disponible, el servicio intenta enviar el correo de todas for
 | Variable | Valor local recomendado | Valor Docker/infra | Descripcion |
 | --- | --- | --- | --- |
 | `SERVER_PORT` | `8089` | `8089` | Puerto REST |
-| `GRPC_PORT` | `9099` | `9099` | Puerto gRPC |
+| `GRPC_PORT` | `9092` | `9092` | Puerto gRPC compatible con routing-service |
 | `MONGODB_URI` | `mongodb://localhost:27017/routingdb` | `mongodb://mongo:27017/routingdb` | Conexion a MongoDB |
 | `SMTP_ENABLED` | `false` | `true` cuando haya credenciales | Activa envio real |
 | `SMTP_HOST` | `smtp.gmail.com` | `smtp.gmail.com` | Host SMTP |
@@ -189,7 +188,7 @@ docker build -t banquito-notification-service .
 Ejecutar local con Mongo en la maquina:
 
 ```bash
-docker run --rm -p 8089:8089 -p 9099:9099 ^
+docker run --rm -p 8089:8089 -p 9092:9092 ^
   -e MONGODB_URI=mongodb://host.docker.internal:27017/routingdb ^
   -e SMTP_ENABLED=false ^
   banquito-notification-service
@@ -215,7 +214,7 @@ NOTIFICATION_AUDIT_ENABLED=true
 Cuando Paul procese un pago On-Us exitoso, puede llamar por gRPC a:
 
 ```text
-notification-service:9099
+notification-service:9092
 ```
 
 Debe enviar `paymentDetailId`, email del beneficiario, asunto, plantilla y variables del pago.
