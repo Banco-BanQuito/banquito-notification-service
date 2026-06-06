@@ -30,6 +30,8 @@ management:
         include: health,info
 
 banquito:
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3003,http://localhost:5173,http://localhost:8010}
   notification:
     from: ${SMTP_FROM:no-reply@banquito.local}
     smtp-enabled: ${SMTP_ENABLED:false}
