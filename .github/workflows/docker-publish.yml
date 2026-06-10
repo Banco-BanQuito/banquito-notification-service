@@ -37,4 +37,4 @@ jobs:
         with:
           context: .
           push: true
-          tags: ghcr.io/banco-banquito/notification-serviceatest
+          tags: ghcr.io/banco-banquito/notification-service:latest
