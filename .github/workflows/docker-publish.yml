@@ -15,6 +15,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Build JAR
+        run: mvn package -DskipTests -q
+
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
@@ -22,10 +32,9 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push
+      - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: Dockerfile
           push: true
-          tags: ghcr.io/banco-banquito/notification-service:latest
+          tags: ghcr.io/banco-banquito/notification-serviceatest
