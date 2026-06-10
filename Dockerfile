@@ -4,7 +4,7 @@ COPY pom.xml .
 RUN mvn dependency:go-offline -q
 COPY src ./src
 RUN mvn generate-sources -q 2>/dev/null || true && \
-    find /root/.m2 -name "*.exe" -exec chmod +x {} \; && \
+    find /app/target -name "*.exe" -exec chmod +x {} \; && \
     mvn package -DskipTests -q
 
 FROM eclipse-temurin:21-jre-alpine
