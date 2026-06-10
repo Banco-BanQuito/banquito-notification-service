@@ -1,11 +1,10 @@
 FROM maven:3.9-eclipse-temurin-21 AS builder
 WORKDIR /app
 COPY pom.xml .
-RUN mvn dependency:go-offline -q
+RUN mvn dependency:go-offline -q && \
+    find /root/.m2 -name "*.exe" -exec chmod +x {} \;
 COPY src ./src
-RUN mvn generate-sources -q 2>/dev/null || true && \
-    find /app/target -name "*.exe" -exec chmod +x {} \; && \
-    mvn package -DskipTests -q
+RUN mvn package -DskipTests -q
 
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
