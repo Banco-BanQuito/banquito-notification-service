@@ -14,6 +14,9 @@ import org.springframework.stereotype.Service;
 @Service
 public class NotificationSenderService {
 
+    private static final String STATUS_SENT = "ENVIADO";
+    private static final String STATUS_SIMULATED = "SIMULADO";
+
     private final JavaMailSender mailSender;
     private final BeneficiaryNotificationRepository auditRepository;
     private final String from;
@@ -35,14 +38,14 @@ public class NotificationSenderService {
 
     public NotificationResponse send(NotificationRequest request) {
         if (alreadySent(request.paymentDetailId())) {
-            return new NotificationResponse("", "ENVIADO", Instant.now().toString(), null);
+            return new NotificationResponse("", STATUS_SENT, Instant.now().toString(), null);
         }
 
         String notificationId = UUID.randomUUID().toString();
         Instant now = Instant.now();
 
         if (!smtpEnabled) {
-            NotificationResponse response = new NotificationResponse(notificationId, "SIMULADO", now.toString(), null);
+            NotificationResponse response = new NotificationResponse(notificationId, STATUS_SIMULATED, now.toString(), null);
             audit(request, response, now);
             return response;
         }
@@ -54,7 +57,7 @@ public class NotificationSenderService {
             message.setSubject(request.subject());
             message.setText(renderBody(request));
             mailSender.send(message);
-            NotificationResponse response = new NotificationResponse(notificationId, "ENVIADO", now.toString(), null);
+            NotificationResponse response = new NotificationResponse(notificationId, STATUS_SENT, now.toString(), null);
             audit(request, response, now);
             return response;
         } catch (Exception ex) {
@@ -69,7 +72,7 @@ public class NotificationSenderService {
             return false;
         }
         try {
-            return auditRepository.findFirstByPaymentDetailIdAndStatus(paymentDetailId, "ENVIADO").isPresent();
+            return auditRepository.findFirstByPaymentDetailIdAndStatus(paymentDetailId, STATUS_SENT).isPresent();
         } catch (Exception ignored) {
             return false;
         }
@@ -79,14 +82,14 @@ public class NotificationSenderService {
         if (!auditEnabled) {
             return;
         }
-        boolean sent = "ENVIADO".equals(response.status()) || "SIMULADO".equals(response.status());
+        boolean sent = STATUS_SENT.equals(response.status()) || STATUS_SIMULATED.equals(response.status());
         try {
             auditRepository.save(new BeneficiaryNotification(
                     request.paymentDetailId(),
                     request.emailTo(),
                     request.subject(),
                     renderBody(request),
-                    sent ? "ENVIADO" : response.status(),
+                    sent ? STATUS_SENT : response.status(),
                     sent ? 0 : 1,
                     sent ? null : now.plusSeconds(300),
                     now,
