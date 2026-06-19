@@ -37,7 +37,10 @@ public class NotificationSenderService {
     }
 
     public NotificationResponse send(NotificationRequest request) {
+        System.out.println(">>> STARTING NOTIFICATION SEND for " + request.emailTo() + " detailId=" + request.paymentDetailId());
+        
         if (alreadySent(request.paymentDetailId())) {
+            System.out.println(">>> ALREADY SENT for detailId=" + request.paymentDetailId());
             return new NotificationResponse("", STATUS_SENT, Instant.now().toString(), null);
         }
 
@@ -45,22 +48,27 @@ public class NotificationSenderService {
         Instant now = Instant.now();
 
         if (!smtpEnabled) {
+            System.out.println(">>> SMTP DISABLED. SIMULATING EMAIL.");
             NotificationResponse response = new NotificationResponse(notificationId, STATUS_SIMULATED, now.toString(), null);
             audit(request, response, now);
             return response;
         }
 
         try {
+            System.out.println(">>> SENDING EMAIL VIA SMTP to " + request.emailTo() + " with subject " + request.subject());
             SimpleMailMessage message = new SimpleMailMessage();
             message.setFrom(from);
             message.setTo(request.emailTo());
             message.setSubject(request.subject());
             message.setText(renderBody(request));
             mailSender.send(message);
+            System.out.println(">>> EMAIL SUCCESSFULLY SENT.");
             NotificationResponse response = new NotificationResponse(notificationId, STATUS_SENT, now.toString(), null);
             audit(request, response, now);
             return response;
         } catch (Exception ex) {
+            System.err.println("FAILED TO SEND EMAIL TO " + request.emailTo() + ": " + ex.getMessage());
+            ex.printStackTrace();
             NotificationResponse response = new NotificationResponse(notificationId, "ERROR", now.toString(), ex.getMessage());
             audit(request, response, now);
             return response;
@@ -68,7 +76,7 @@ public class NotificationSenderService {
     }
 
     private boolean alreadySent(String paymentDetailId) {
-        if (!auditEnabled || paymentDetailId == null || paymentDetailId.isBlank()) {
+        if (!auditEnabled || paymentDetailId == null || paymentDetailId.isBlank() || "0".equals(paymentDetailId)) {
             return false;
         }
         try {
@@ -102,6 +110,41 @@ public class NotificationSenderService {
     }
 
     private String renderBody(NotificationRequest request) {
+        if ("ACCOUNT_STATUS_CHANGED".equals(request.bodyTemplate())) {
+            return renderAccountStatusChangedBody(request);
+        }
+        if ("TRANSACTION_EXECUTED".equals(request.bodyTemplate())) {
+            return renderTransactionExecutedBody(request);
+        }
+        return renderPaymentReceivedBody(request);
+    }
+
+    private String renderTransactionExecutedBody(NotificationRequest request) {
+        String customerName = request.variables().getOrDefault("customerName", "");
+        String accountNumber = request.variables().getOrDefault("accountNumber", "");
+        String transactionType = request.variables().getOrDefault("transactionType", "");
+        String amount = request.variables().getOrDefault("amount", "");
+        String newBalance = request.variables().getOrDefault("newBalance", "");
+        String date = request.variables().getOrDefault("date", "");
+        String movement = "CREDITO".equals(transactionType) ? "Depósito" : "Retiro";
+
+        return """
+                Estimado(a) %s,
+
+                Se ha registrado un movimiento en tu cuenta %s.
+
+                Tipo de movimiento: %s
+                Monto: %s
+                Saldo disponible actual: %s
+                Fecha: %s
+
+                Si usted no reconoce este movimiento, contacte a su agencia BanQuito.
+
+                Este mensaje fue generado automaticamente por BanQuito.
+                """.formatted(customerName, accountNumber, movement, amount, newBalance, date);
+    }
+
+    private String renderPaymentReceivedBody(NotificationRequest request) {
         String amount = request.variables().getOrDefault("amount", "");
         String companyName = request.variables().getOrDefault("companyName", "");
         String concept = request.variables().getOrDefault("concept", "");
@@ -119,5 +162,24 @@ public class NotificationSenderService {
 
                 Este mensaje fue generado automaticamente por BanQuito.
                 """.formatted(companyName, amount, concept, date);
+    }
+
+    private String renderAccountStatusChangedBody(NotificationRequest request) {
+        String customerName = request.variables().getOrDefault("customerName", "");
+        String accountNumber = request.variables().getOrDefault("accountNumber", "");
+        String newStatus = request.variables().getOrDefault("newStatus", "");
+        String date = request.variables().getOrDefault("date", "");
+
+        return """
+                Estimado(a) %s,
+
+                El estado de su cuenta %s ha cambiado a: %s
+
+                Fecha: %s
+
+                Si usted no reconoce este cambio, contacte a su agencia BanQuito.
+
+                Este mensaje fue generado automaticamente por BanQuito.
+                """.formatted(customerName, accountNumber, newStatus, date);
     }
 }

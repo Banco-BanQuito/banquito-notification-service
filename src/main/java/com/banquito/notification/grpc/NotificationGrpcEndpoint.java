@@ -6,9 +6,9 @@ import com.banquito.notification.service.NotificationSenderService;
 import com.banquito.payswitch.notification.NotificationResponse.Builder;
 import com.banquito.payswitch.notification.NotificationServiceGrpc;
 import io.grpc.stub.StreamObserver;
-import org.springframework.stereotype.Component;
+import net.devh.boot.grpc.server.service.GrpcService;
 
-@Component
+@GrpcService
 public class NotificationGrpcEndpoint extends NotificationServiceGrpc.NotificationServiceImplBase {
 
     private final NotificationSenderService senderService;
