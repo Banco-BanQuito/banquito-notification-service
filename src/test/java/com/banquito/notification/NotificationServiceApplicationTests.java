@@ -12,5 +12,6 @@ class NotificationServiceApplicationTests {
 
     @Test
     void contextLoads() {
+        // Spring Boot levanta el contexto con SMTP y auditoria desactivados para validar la configuracion base.
     }
 }
