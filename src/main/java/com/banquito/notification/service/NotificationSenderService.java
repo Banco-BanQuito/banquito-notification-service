@@ -6,6 +6,8 @@ import com.banquito.notification.model.BeneficiaryNotification;
 import com.banquito.notification.repository.BeneficiaryNotificationRepository;
 import java.time.Instant;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -13,6 +15,8 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class NotificationSenderService {
+
+    private static final Logger log = LoggerFactory.getLogger(NotificationSenderService.class);
 
     private static final String STATUS_SENT = "ENVIADO";
     private static final String STATUS_SIMULATED = "SIMULADO";
@@ -37,10 +41,10 @@ public class NotificationSenderService {
     }
 
     public NotificationResponse send(NotificationRequest request) {
-        System.out.println(">>> STARTING NOTIFICATION SEND for " + request.emailTo() + " detailId=" + request.paymentDetailId());
-        
+        log.info("Starting notification send for {} detailId={}", request.emailTo(), request.paymentDetailId());
+
         if (alreadySent(request.paymentDetailId())) {
-            System.out.println(">>> ALREADY SENT for detailId=" + request.paymentDetailId());
+            log.info("Already sent for detailId={}", request.paymentDetailId());
             return new NotificationResponse("", STATUS_SENT, Instant.now().toString(), null);
         }
 
@@ -48,27 +52,26 @@ public class NotificationSenderService {
         Instant now = Instant.now();
 
         if (!smtpEnabled) {
-            System.out.println(">>> SMTP DISABLED. SIMULATING EMAIL.");
+            log.info("SMTP disabled. Simulating email.");
             NotificationResponse response = new NotificationResponse(notificationId, STATUS_SIMULATED, now.toString(), null);
             audit(request, response, now);
             return response;
         }
 
         try {
-            System.out.println(">>> SENDING EMAIL VIA SMTP to " + request.emailTo() + " with subject " + request.subject());
+            log.info("Sending email via SMTP to {} with subject {}", request.emailTo(), request.subject());
             SimpleMailMessage message = new SimpleMailMessage();
             message.setFrom(from);
             message.setTo(request.emailTo());
             message.setSubject(request.subject());
             message.setText(renderBody(request));
             mailSender.send(message);
-            System.out.println(">>> EMAIL SUCCESSFULLY SENT.");
+            log.info("Email successfully sent.");
             NotificationResponse response = new NotificationResponse(notificationId, STATUS_SENT, now.toString(), null);
             audit(request, response, now);
             return response;
         } catch (Exception ex) {
-            System.err.println("FAILED TO SEND EMAIL TO " + request.emailTo() + ": " + ex.getMessage());
-            ex.printStackTrace();
+            log.error("Failed to send email to {}: {}", request.emailTo(), ex.getMessage(), ex);
             NotificationResponse response = new NotificationResponse(notificationId, "ERROR", now.toString(), ex.getMessage());
             audit(request, response, now);
             return response;
@@ -92,18 +95,18 @@ public class NotificationSenderService {
         }
         boolean sent = STATUS_SENT.equals(response.status()) || STATUS_SIMULATED.equals(response.status());
         try {
-            auditRepository.save(new BeneficiaryNotification(
-                    request.paymentDetailId(),
-                    request.emailTo(),
-                    request.subject(),
-                    renderBody(request),
-                    sent ? STATUS_SENT : response.status(),
-                    sent ? 0 : 1,
-                    sent ? null : now.plusSeconds(300),
-                    now,
-                    sent ? now : null,
-                    response.errorMessage()
-            ));
+            auditRepository.save(BeneficiaryNotification.builder()
+                    .paymentDetailId(request.paymentDetailId())
+                    .emailTo(request.emailTo())
+                    .subject(request.subject())
+                    .messageBody(renderBody(request))
+                    .status(sent ? STATUS_SENT : response.status())
+                    .retryCount(sent ? 0 : 1)
+                    .nextRetryAt(sent ? null : now.plusSeconds(300))
+                    .createdAt(now)
+                    .sentAt(sent ? now : null)
+                    .errorMessage(response.errorMessage())
+                    .build());
         } catch (Exception ignored) {
             // El correo no debe fallar por un problema temporal de auditoria Mongo.
         }
