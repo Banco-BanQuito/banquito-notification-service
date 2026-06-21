@@ -166,4 +166,12 @@ public class BeneficiaryNotification {
     public String getErrorMessage() {
         return errorMessage;
     }
+
+    public String getSubject() {
+        return subject;
+    }
+
+    public String getStatus() {
+        return status;
+    }
 }

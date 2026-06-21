@@ -17,9 +17,9 @@ import org.springframework.stereotype.Service;
 public class NotificationSenderService {
 
     private static final Logger log = LoggerFactory.getLogger(NotificationSenderService.class);
-
     private static final String STATUS_SENT = "ENVIADO";
     private static final String STATUS_SIMULATED = "SIMULADO";
+    private static final String STATUS_ERROR = "ERROR";
 
     private final JavaMailSender mailSender;
     private final BeneficiaryNotificationRepository auditRepository;
@@ -66,13 +66,13 @@ public class NotificationSenderService {
             message.setSubject(request.subject());
             message.setText(renderBody(request));
             mailSender.send(message);
-            log.info("Email successfully sent.");
+            log.info("Email successfully sent to {}", request.emailTo());
             NotificationResponse response = new NotificationResponse(notificationId, STATUS_SENT, now.toString(), null);
             audit(request, response, now);
             return response;
         } catch (Exception ex) {
-            log.error("Failed to send email to {}: {}", request.emailTo(), ex.getMessage(), ex);
-            NotificationResponse response = new NotificationResponse(notificationId, "ERROR", now.toString(), ex.getMessage());
+            log.error("Failed to send email to {}", request.emailTo(), ex);
+            NotificationResponse response = new NotificationResponse(notificationId, STATUS_ERROR, now.toString(), ex.getMessage());
             audit(request, response, now);
             return response;
         }
