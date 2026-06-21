@@ -6,6 +6,8 @@ import com.banquito.notification.model.BeneficiaryNotification;
 import com.banquito.notification.repository.BeneficiaryNotificationRepository;
 import java.time.Instant;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -14,8 +16,10 @@ import org.springframework.stereotype.Service;
 @Service
 public class NotificationSenderService {
 
+    private static final Logger LOG = LoggerFactory.getLogger(NotificationSenderService.class);
     private static final String STATUS_SENT = "ENVIADO";
     private static final String STATUS_SIMULATED = "SIMULADO";
+    private static final String STATUS_ERROR = "ERROR";
 
     private final JavaMailSender mailSender;
     private final BeneficiaryNotificationRepository auditRepository;
@@ -37,10 +41,10 @@ public class NotificationSenderService {
     }
 
     public NotificationResponse send(NotificationRequest request) {
-        System.out.println(">>> STARTING NOTIFICATION SEND for " + request.emailTo() + " detailId=" + request.paymentDetailId());
+        LOG.info("Starting notification send for {} detailId={}", request.emailTo(), request.paymentDetailId());
         
         if (alreadySent(request.paymentDetailId())) {
-            System.out.println(">>> ALREADY SENT for detailId=" + request.paymentDetailId());
+            LOG.info("Notification already sent for detailId={}", request.paymentDetailId());
             return new NotificationResponse("", STATUS_SENT, Instant.now().toString(), null);
         }
 
@@ -48,28 +52,27 @@ public class NotificationSenderService {
         Instant now = Instant.now();
 
         if (!smtpEnabled) {
-            System.out.println(">>> SMTP DISABLED. SIMULATING EMAIL.");
+            LOG.info("SMTP disabled. Simulating notification delivery.");
             NotificationResponse response = new NotificationResponse(notificationId, STATUS_SIMULATED, now.toString(), null);
             audit(request, response, now);
             return response;
         }
 
         try {
-            System.out.println(">>> SENDING EMAIL VIA SMTP to " + request.emailTo() + " with subject " + request.subject());
+            LOG.info("Sending email via SMTP to {} with subject {}", request.emailTo(), request.subject());
             SimpleMailMessage message = new SimpleMailMessage();
             message.setFrom(from);
             message.setTo(request.emailTo());
             message.setSubject(request.subject());
             message.setText(renderBody(request));
             mailSender.send(message);
-            System.out.println(">>> EMAIL SUCCESSFULLY SENT.");
+            LOG.info("Email successfully sent to {}", request.emailTo());
             NotificationResponse response = new NotificationResponse(notificationId, STATUS_SENT, now.toString(), null);
             audit(request, response, now);
             return response;
         } catch (Exception ex) {
-            System.err.println("FAILED TO SEND EMAIL TO " + request.emailTo() + ": " + ex.getMessage());
-            ex.printStackTrace();
-            NotificationResponse response = new NotificationResponse(notificationId, "ERROR", now.toString(), ex.getMessage());
+            LOG.error("Failed to send email to {}", request.emailTo(), ex);
+            NotificationResponse response = new NotificationResponse(notificationId, STATUS_ERROR, now.toString(), ex.getMessage());
             audit(request, response, now);
             return response;
         }

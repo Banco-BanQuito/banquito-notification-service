@@ -54,4 +54,12 @@ public class BeneficiaryNotification {
         this.sentAt = sentAt;
         this.errorMessage = errorMessage;
     }
+
+    public String getSubject() {
+        return subject;
+    }
+
+    public String getStatus() {
+        return status;
+    }
 }
